@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seventy7 — Production View</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800&family=DM+Mono:wght@300;400;500&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e1117;--surface:#151b27;--card:#1c2333;--border:#2a3347;
+  --teal:#00d4b4;--teal-dim:rgba(0,212,180,0.1);--teal-mid:rgba(0,212,180,0.25);
+  --amber:#f5a623;--amber-dim:rgba(245,166,35,0.1);
+  --red:#ff5e5e;--green:#3ddc84;
+  --white:#e8edf5;--muted:#5e6e8a;--mid:#8899b8;
+  --pre:#4a9eff;--post:#c084fc;--internal:#f5a623;
+}
+[data-theme="light"]{
+  --bg:#f2f4f8;--surface:#e8ecf2;--card:#ffffff;--border:#d0d7e3;
+  --teal:#00a896;--teal-dim:rgba(0,168,150,0.08);--teal-mid:rgba(0,168,150,0.2);
+  --amber:#d4860a;--amber-dim:rgba(212,134,10,0.08);
+  --red:#d63031;--green:#00875a;
+  --white:#1a2236;--muted:#7a8aaa;--mid:#4a5a7a;
+  --pre:#2176d4;--post:#7c3aed;--internal:#d4860a;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;font-size:13px;line-height:1.5;min-height:100vh;transition:background .2s,color .2s;}
+.theme-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:5px 9px;cursor:pointer;font-size:13px;line-height:1;transition:all .2s;border-radius:2px;}
+.theme-btn:hover{border-color:var(--mid);color:var(--white);}
+
+/* ── Loading / Empty ── */
+#loading-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-txt{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;}
+
+#empty-screen{min-height:100vh;display:none;flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center;}
+.logo-empty{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:28px;letter-spacing:.14em;margin-bottom:6px;}
+.logo-empty span{color:var(--teal);}
+.empty-role{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:40px;}
+
+/* ── Upload modal ── */
+.upload-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;align-items:center;justify-content:center;padding:24px;}
+.upload-modal.open{display:flex;}
+.upload-box{background:var(--card);border:1px solid var(--border);width:100%;max-width:480px;padding:36px;max-height:90vh;overflow-y:auto;}
+.upload-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;}
+.modal-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;transition:color .15s;}
+.modal-close:hover{color:var(--white);}
+.field-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:block;}
+.period-input{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:9px 12px;outline:none;transition:border-color .2s;margin-bottom:20px;}
+.period-input:focus{border-color:var(--teal);}
+.drop-zone{border:1px dashed var(--border);padding:32px 20px;text-align:center;cursor:pointer;transition:all .2s;}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--teal);background:var(--teal-dim);}
+.dz-icon{font-size:28px;opacity:.3;margin-bottom:10px;}
+.dz-title{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;}
+.dz-sub{font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.7;}
+.dz-sub code{font-family:'DM Mono',monospace;background:rgba(255,255,255,.06);padding:2px 6px;color:var(--mid);}
+.btn-primary{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:var(--teal);color:#0e1117;border:none;padding:10px 22px;cursor:pointer;transition:opacity .2s;}
+.btn-primary:hover{opacity:.85;}
+.btn-ghost{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;cursor:pointer;transition:all .2s;}
+.btn-ghost:hover{border-color:var(--mid);color:var(--white);}
+.upload-err{color:var(--red);font-size:11px;font-family:'DM Mono',monospace;margin-top:10px;display:none;}
+.save-status{font-family:'DM Mono',monospace;font-size:11px;padding:10px 12px;margin-top:12px;display:none;}
+.save-status.saving{display:block;background:rgba(255,255,255,.04);color:var(--muted);}
+.save-status.saved{display:block;background:rgba(61,220,132,.08);color:var(--green);border:1px solid rgba(61,220,132,.2);}
+.save-status.failed{display:block;background:rgba(255,94,94,.08);color:var(--red);border:1px solid rgba(255,94,94,.2);}
+
+/* ── Topbar ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:13px 36px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:100;}
+.brand{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:17px;letter-spacing:.12em;}
+.brand span{color:var(--teal);}
+.brand-role{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-left:10px;vertical-align:middle;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.period-badge{font-family:'DM Mono',monospace;font-size:10px;background:var(--teal-dim);border:1px solid var(--teal-mid);color:var(--teal);padding:4px 12px;letter-spacing:.06em;text-transform:uppercase;}
+.updated-txt{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);}
+
+/* ── Nav ── */
+.nav{display:flex;padding:0 36px;border-bottom:1px solid var(--border);overflow-x:auto;background:var(--bg);}
+.nav button{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;background:none;border:none;color:var(--muted);padding:12px 16px;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;}
+.nav button:hover{color:var(--white);}
+.nav button.active{color:var(--teal);border-bottom-color:var(--teal);}
+.nav-soon{color:var(--muted);opacity:.4;cursor:default !important;}
+.nav-soon:hover{color:var(--muted) !important;}
+
+/* ── Content ── */
+.content{padding:36px;}
+.tab-section{display:none;animation:fadeUp .25s ease both;}
+.tab-section.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.section-head{display:flex;align-items:baseline;gap:14px;margin-bottom:20px;}
+.section-title{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
+.section-sub{font-size:11px;color:var(--muted);}
+
+/* ── KPI grid ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:36px;}
+.kpi{background:var(--card);padding:22px 20px;}
+.kpi-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.kpi-value{font-family:'Barlow Condensed',sans-serif;font-size:38px;font-weight:700;line-height:1;}
+.kpi-value.teal{color:var(--teal);}
+.kpi-value.pre{color:var(--pre);}
+.kpi-value.post{color:var(--post);}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:6px;}
+
+/* ── Summary split row ── */
+.split-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:36px;}
+
+/* ── Job type cards ── */
+.jobtype-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);}
+.jt-card{background:var(--card);padding:20px;}
+.jt-name{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.jt-hours{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:700;line-height:1;margin-bottom:8px;}
+.jt-bar{height:2px;background:rgba(255,255,255,.06);margin-bottom:12px;overflow:hidden;}
+.jt-bar-fill{height:100%;}
+.jt-split{display:flex;gap:14px;}
+.jt-split-item{font-family:'DM Mono',monospace;font-size:10px;}
+.jt-split-label{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.08em;}
+
+/* ── Tables ── */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+thead th{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:9px 13px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;}
+thead th:first-child,thead th.left{text-align:left;}
+tbody tr{border-bottom:1px solid rgba(128,128,170,.08);transition:background .12s;}
+tbody tr:hover{background:rgba(128,128,170,.05);}
+tbody tr.group-row td{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:14px 13px 5px;border-bottom:none;}
+tbody tr.total-row td{font-weight:600;background:var(--surface);}
+td{padding:9px 13px;color:var(--white);text-align:right;font-family:'DM Mono',monospace;font-size:12px;}
+td:first-child,td.left{text-align:left;font-family:'Barlow',sans-serif;font-size:13px;font-weight:500;}
+td.muted{color:var(--muted);font-size:11px;}
+
+/* ── Phase bar (pre/post split) ── */
+.phase-bar-wrap{display:flex;align-items:center;gap:8px;justify-content:flex-end;}
+.phase-bar{width:60px;height:4px;background:rgba(128,128,170,.12);border-radius:2px;overflow:hidden;display:flex;}
+.phase-pre-fill{height:100%;background:var(--pre);border-radius:2px 0 0 2px;}
+.phase-post-fill{height:100%;background:var(--post);}
+.phase-val{font-family:'DM Mono',monospace;font-size:11px;min-width:44px;text-align:right;}
+
+/* ── Job type badge ── */
+.jt-badge{display:inline-flex;align-items:center;font-size:10px;padding:2px 8px;font-family:'DM Mono',monospace;white-space:nowrap;border-radius:2px;}
+.jt-badge.Campaign{background:rgba(74,158,255,.12);color:#4a9eff;}
+.jt-badge.Creative{background:rgba(192,132,252,.12);color:#c084fc;}
+.jt-badge.Elevated{background:rgba(0,212,180,.1);color:var(--teal);}
+.jt-badge.Ecom{background:rgba(245,166,35,.1);color:var(--amber);}
+.jt-badge.Other{background:rgba(128,128,170,.1);color:var(--mid);}
+
+/* ── Hours bar ── */
+.hrs-bar-wrap{display:flex;align-items:center;gap:8px;justify-content:flex-end;}
+.hrs-bar{width:80px;height:3px;background:rgba(128,128,170,.1);border-radius:2px;overflow:hidden;}
+.hrs-bar-fill{height:100%;border-radius:2px;background:var(--teal);}
+.hrs-val{font-family:'DM Mono',monospace;font-size:12px;min-width:44px;text-align:right;}
+
+/* ── Internal breakdown ── */
+.int-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:28px;}
+.int-cell{background:var(--card);padding:18px 16px;}
+.int-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.int-val{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;color:var(--amber);}
+.int-pct{font-size:11px;color:var(--muted);margin-top:4px;}
+
+/* ── Coming soon ── */
+.coming-soon{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:340px;gap:14px;text-align:center;}
+
+/* ── Producer drilldown ── */
+.producer-row:hover td { background: rgba(128,128,170,.04); }
+.producer-row td:first-child { transition: color .15s; }
+#expand-row-* td { animation: fadeUp .2s ease both; }
+.cs-icon{font-size:42px;opacity:.2;}
+.cs-title{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mid);}
+.cs-sub{font-size:12px;color:var(--muted);max-width:300px;line-height:1.8;}
+
+/* ── Top clients on overview ── */
+.client-preview{border:1px solid var(--border);}
+.client-preview-row{display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid rgba(128,128,170,.07);gap:12px;transition:background .12s;}
+.client-preview-row:last-child{border-bottom:none;}
+.client-preview-row:hover{background:rgba(128,128,170,.04);}
+.cp-rank{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);width:22px;flex-shrink:0;}
+.cp-name{flex:1;font-size:13px;font-weight:500;}
+.cp-jt{flex-shrink:0;}
+.cp-hrs{font-family:'DM Mono',monospace;font-size:12px;color:var(--white);min-width:48px;text-align:right;flex-shrink:0;}
+.cp-bar{width:70px;flex-shrink:0;}
+.cp-bar-inner{height:3px;background:rgba(128,128,170,.1);border-radius:2px;overflow:hidden;}
+.cp-bar-fill{height:100%;background:var(--teal);border-radius:2px;}
+
+/* ── Footer ── */
+footer{padding:14px 36px;border-top:1px solid var(--border);}
+.footer-v{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:.07em;}
+
+@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.jobtype-grid{grid-template-columns:repeat(2,1fr)}.split-grid{grid-template-columns:1fr}}
+@media(max-width:700px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.int-grid{grid-template-columns:repeat(2,1fr)}.content{padding:20px}.topbar,.nav{padding-left:20px;padding-right:20px}}
+</style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-txt">Loading production report</div>
+</div>
+
+<div id="empty-screen">
+  <div style="position:absolute;top:14px;right:20px;display:flex;gap:8px;align-items:center">
+    <button class="theme-btn" id="theme-btn-empty" onclick="toggleTheme()">☀</button>
+    <button class="btn-ghost" onclick="openUploadModal()">Upload Report</button>
+  </div>
+  <div class="logo-empty">SEVENTY<span>7</span><span class="brand-role">Production</span></div>
+  <div class="empty-role">Production View</div>
+  <div style="font-size:40px;opacity:.2;margin-bottom:20px">📋</div>
+  <p style="color:var(--muted);font-size:13px;max-width:320px;line-height:1.8;margin-bottom:28px">No report uploaded yet. Drop a Time Overview export to get started.</p>
+  <button class="btn-primary" onclick="openUploadModal()">Upload Time Overview</button>
+</div>
+
+<!-- Upload Modal -->
+<div class="upload-modal" id="upload-modal">
+  <div class="upload-box">
+    <div class="upload-title">
+      Upload Report
+      <button class="modal-close" onclick="closeUploadModal()">&#x2715;</button>
+    </div>
+    <label class="field-label">Period</label>
+    <input class="period-input" id="period-input" type="text" placeholder="e.g. September 2024">
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="dz-icon">📂</div>
+      <div class="dz-title">Drop Time Overview Export</div>
+      <div class="dz-sub"><code>Time Overview (Employee / Customer / Job)</code> from Workbook</div>
+      <button class="btn-primary" style="font-size:11px;padding:9px 20px" onclick="event.stopPropagation();document.getElementById('file-input').click()">Choose File</button>
+    </div>
+    <div class="upload-err" id="upload-err"></div>
+    <div class="save-status" id="save-status"></div>
+    <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(event)">
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard" style="display:none">
+  <header class="topbar">
+    <div>
+      <span class="brand">SEVENTY<span>7</span></span>
+      <span class="brand-role">Production View</span>
+    </div>
+    <div class="topbar-right">
+      <span class="updated-txt" id="updated-txt"></span>
+      <div class="period-badge" id="period-badge">--</div>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀</button>
+      <button class="btn-ghost" onclick="openUploadModal()">Update Report</button>
+    </div>
+  </header>
+
+  <nav class="nav">
+    <button class="active" onclick="showTab('tab-overview',this)">Dashboard</button>
+    <button onclick="showTab('tab-team',this)">Team</button>
+    <button onclick="showTab('tab-jobtypes',this)">Job Types</button>
+    <button class="nav-soon" onclick="">Capacity ↗ Coming Soon</button>
+  </nav>
+
+  <main class="content">
+
+    <!-- DASHBOARD TAB -->
+    <div id="tab-overview" class="tab-section active">
+      <div class="kpi-grid" id="kpi-grid"></div>
+
+      <!-- Two column: top clients by total | top clients by post-prod -->
+      <div class="split-grid" style="margin-bottom:36px">
+        <div>
+          <div class="section-head">
+            <div class="section-title">Top Clients</div>
+            <div class="section-sub" id="clients-sub"></div>
+          </div>
+          <div id="client-preview"></div>
+        </div>
+        <div>
+          <div class="section-head">
+            <div class="section-title">Top Post-Production</div>
+            <div class="section-sub" id="postprod-sub"></div>
+          </div>
+          <div id="postprod-preview"></div>
+        </div>
+      </div>
+
+      <!-- Hours breakdown donut-style bar -->
+      <div class="section-head">
+        <div class="section-title">Hours Breakdown</div>
+        <div class="section-sub" id="breakdown-sub"></div>
+      </div>
+      <div id="hours-breakdown"></div>
+    </div>
+
+    <!-- CLIENTS TAB removed - info now on dashboard -->
+
+    <!-- JOB TYPES TAB -->
+    <div id="tab-jobtypes" class="tab-section">
+      <div class="section-head">
+        <div class="section-title">Time Per Job Type</div>
+        <div class="section-sub">Campaign · Creative · Elevated · Ecom</div>
+      </div>
+      <!-- 5 cards in one row -->
+      <div id="jt-cards" style="display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:32px"></div>
+
+      <div class="section-head">
+        <div class="section-title">Client Breakdown</div>
+        <div class="section-sub" id="jt-table-sub"></div>
+      </div>
+
+      <!-- Filter bar -->
+      <div id="jt-filters" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px">
+        <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Filter</span>
+        <select id="filter-jt" onchange="applyJtFilters()" style="background:var(--surface);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:11px;padding:5px 10px;outline:none;cursor:pointer">
+          <option value="">All Types</option>
+          <option value="Ecom">Ecom</option>
+          <option value="Campaign">Campaign</option>
+          <option value="Creative">Creative</option>
+          <option value="Elevated">Elevated</option>
+          <option value="Other">Other</option>
+        </select>
+        <select id="filter-sort" onchange="applyJtFilters()" style="background:var(--surface);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:11px;padding:5px 10px;outline:none;cursor:pointer">
+          <option value="total">Sort: Total Hrs</option>
+          <option value="pre">Sort: Pre-Prod</option>
+          <option value="post">Sort: Post-Prod</option>
+        </select>
+        <button onclick="resetJtFilters()" class="btn-ghost" style="font-size:10px;padding:5px 12px">Reset</button>
+        <span id="jt-filter-count" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-left:4px"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="left">Client</th>
+            <th>Job Type</th>
+            <th id="th-total" onclick="setSortCol('total')" style="cursor:pointer">Total Hrs ↕</th>
+            <th id="th-pre"   onclick="setSortCol('pre')"   style="cursor:pointer">Pre-Prod ↕</th>
+            <th id="th-post"  onclick="setSortCol('post')"  style="cursor:pointer">Post-Prod ↕</th>
+            <th>Pre / Post Split</th>
+          </tr></thead>
+          <tbody id="jt-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TEAM TAB -->
+    <div id="tab-team" class="tab-section">
+      <div class="section-head">
+        <div class="section-title">Production Team</div>
+        <div class="section-sub" id="team-sub"></div>
+      </div>
+      <!-- 6 cards: 5 producers + 1 coordinator -->
+      <div id="team-cards" style="display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:32px"></div>
+
+      <div class="section-head">
+        <div class="section-title">Team Detail</div>
+        <div class="section-sub">Click a name to see their client breakdown</div>
+      </div>
+      <div class="table-wrap" style="margin-bottom:40px">
+        <table>
+          <thead><tr>
+            <th class="left">Name</th>
+            <th>Client Hrs</th>
+            <th>Pre-Prod</th>
+            <th>Post-Prod</th>
+            <th>Internal</th>
+            <th>Holiday</th>
+            <th>Sick</th>
+            <th>Pre / Post Split</th>
+          </tr></thead>
+          <tbody id="team-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+  <footer><span class="footer-v">v0.0.2 · Production View</span></footer>
+</div>
+
+<script>
+const FIREBASE_DB_URL = 'https://utilisation-report-default-rtdb.europe-west1.firebasedatabase.app';
+const FB_PROD = FIREBASE_DB_URL ? FIREBASE_DB_URL + '/report/production.json' : '';
+const LS_KEY = 's77_production_v1';
+
+const PRODUCERS = [
+  { name: 'Emma Peak',          title: 'Senior Producer' },
+  { name: 'Charlotte Mcilroy',  title: 'Producer' },
+  { name: 'Victoria Adkins',    title: 'Producer' },
+  { name: 'Inez Tully',         title: 'Ecom Producer' },
+  { name: 'Alessia Lawrence',   title: 'Ecom Producer' },
+];
+
+const COORDINATORS = [
+  { name: 'Eleanor Hope-Ross',  title: 'Post-Production Coordinator' },
+];
+
+// Flat name arrays for lookup
+const PRODUCER_NAMES    = PRODUCERS.map(p => p.name);
+const COORDINATOR_NAMES = COORDINATORS.map(c => c.name);
+const ALL_TEAM          = [...PRODUCERS, ...COORDINATORS].map(m => m.name);
+
+const INTERNAL_CUSTOMERS = ['· Internal'];
+const HOLIDAY_CUSTOMERS  = ['· Holiday','· Illness & absence'];
+
+// ─── Job type detection from job name ───
+function detectJobType(jobname) {
+  const j = (jobname || '').toLowerCase();
+  if (j.includes('elevated')) return 'Elevated';
+  if (j.includes('campaign') || j.includes('lifestyle') || j.includes('brand shoot')) return 'Campaign';
+  if (j.includes('ecom') || j.includes('e-com') || j.includes('packshot') || j.includes('stills ecom') || j.includes('model ecom')) return 'Ecom';
+  if (j.includes('creative') || j.includes('art direct')) return 'Creative';
+  return 'Other';
+}
+
+// ─── Phase detection from task name ───
+function detectPhase(taskname) {
+  const t = (taskname || '').toLowerCase();
+  if (t.includes('post') || t.includes('retouch') || t.includes(' qa') || t.startsWith('qa') || t.includes('amend') || t.includes('edit') || t.includes('grade') || t.includes('colour')) return 'post';
+  return 'pre';
+}
+
+// ─── Internal task categorisation ───
+// Works from either TaskName (detailed export) or JobName (summary export)
+function categoriseInternal(name) {
+  const t = (name || '').toLowerCase();
+  if (t.includes('meeting') || t.includes('calendar')) return 'Meetings';
+  if (t.includes('admin')) return 'Admin';
+  if (t.includes('studio assist') || t.includes('studio assis')) return 'Studio Assist';
+  if (t.includes('manager') || t.includes('management')) return 'Management';
+  if (t.includes('training') || t.includes('upskill') || t.includes('development')) return 'Training';
+  if (t.includes('internal time') || t.includes('internal')) return 'General Internal';
+  if (t.includes('production')) return 'Internal Production';
+  return 'Other Internal';
+}
+
+// ─── Helpers ───
+const fmt = n => typeof n === 'number' ? (n % 1 === 0 ? n.toLocaleString() : n.toFixed(1)) : n;
+const fPct = n => (n * 100).toFixed(1) + '%';
+const round1 = n => Math.round(n * 10) / 10;
+function niceDate(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); } catch(e) { return ''; }
+}
+function volBadge(pct) {
+  if (pct >= 0.1) return '<span class="jt-badge Campaign" style="background:rgba(255,94,94,.1);color:#ff5e5e">⬤ Major</span>';
+  if (pct >= 0.05) return '<span class="jt-badge Ecom">⬤ Mid</span>';
+  return '<span class="jt-badge Other">⬤ Minor</span>';
+}
+function phaseBar(pre, post) {
+  const total = pre + post;
+  if (total === 0) return '<span style="color:var(--muted);font-size:10px;font-family:\'DM Mono\',monospace">—</span>';
+  const prePct = pre / total;
+  return `<div class="phase-bar-wrap">
+    <div class="phase-bar">
+      <div class="phase-pre-fill" style="width:${(prePct*100).toFixed(1)}%"></div>
+      <div class="phase-post-fill" style="width:${((1-prePct)*100).toFixed(1)}%"></div>
+    </div>
+    <span class="phase-val" style="color:var(--mid);font-size:10px">${fPct(prePct)} / ${fPct(1-prePct)}</span>
+  </div>`;
+}
+function hrsBar(hrs, max) {
+  const pct = max === 0 ? 0 : Math.min(hrs / max, 1);
+  return `<div class="hrs-bar-wrap"><div class="hrs-bar"><div class="hrs-bar-fill" style="width:${(pct*100).toFixed(1)}%"></div></div><span class="hrs-val">${fmt(hrs)}</span></div>`;
+}
+
+async function fbGet(url) { try { const r = await fetch(url); if (!r.ok) return null; return r.json(); } catch(e) { return null; } }
+async function fbPut(url, data) { const r = await fetch(url, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); if (!r.ok) throw new Error('Firebase error ' + r.status); }
+function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const isLight = html.getAttribute('data-theme') === 'light';
+  html.setAttribute('data-theme', isLight ? 'dark' : 'light');
+  const icon = isLight ? '☀' : '🌙';
+  ['theme-btn','theme-btn-empty'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = icon; });
+  lsSet('s77_prod_theme', isLight ? 'dark' : 'light');
+}
+function initTheme() {
+  const saved = lsGet('s77_prod_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  const icon = saved === 'light' ? '🌙' : '☀';
+  ['theme-btn','theme-btn-empty'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = icon; });
+}
+
+// ─── Upload modal ───
+function openUploadModal() {
+  document.getElementById('upload-modal').classList.add('open');
+  document.getElementById('upload-err').style.display = 'none';
+  document.getElementById('save-status').className = 'save-status';
+  setTimeout(() => document.getElementById('period-input').focus(), 80);
+}
+function closeUploadModal() { document.getElementById('upload-modal').classList.remove('open'); }
+document.getElementById('upload-modal').addEventListener('click', e => { if (e.target === document.getElementById('upload-modal')) closeUploadModal(); });
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f) processFile(f); });
+function handleFile(e) { const f = e.target.files[0]; if (f) processFile(f); }
+
+// ─── Core parser ───
+async function processFile(file) {
+  const errEl = document.getElementById('upload-err');
+  const statusEl = document.getElementById('save-status');
+  errEl.style.display = 'none'; statusEl.className = 'save-status';
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+      // Find header row
+      let hr = -1;
+      for (let i = 0; i < 20; i++) {
+        if (rows[i] && (rows[i].includes('EmpName') || rows[i].includes('EmployeeId'))) { hr = i; break; }
+      }
+      if (hr === -1) throw new Error('Cannot find header row — is this a Time Overview export?');
+
+      const hd = rows[hr];
+      // Case-insensitive column finder — tries each alias in order
+      const ix = (...names) => {
+        for (const n of names) {
+          const i = hd.findIndex(c => String(c).trim().toLowerCase() === n.toLowerCase());
+          if (i !== -1) return i;
+        }
+        return -1;
+      };
+
+      const iEmp  = ix('EmpName');
+      const iCust = ix('CustomerName');
+      const iJob  = ix('JobName', 'Jobname');           // handles both casings
+      const iTask = ix('TaskName');                      // optional — may be -1
+      const iHrs  = ix('HRSTOT', 'TNum');
+
+      if ([iEmp, iCust, iJob, iHrs].some(i => i === -1)) {
+        // Build a helpful list of what's actually missing
+        const missing = [];
+        if (iEmp  === -1) missing.push('EmpName');
+        if (iCust === -1) missing.push('CustomerName');
+        if (iJob  === -1) missing.push('JobName');
+        if (iHrs  === -1) missing.push('HRSTOT / TNum');
+        throw new Error(`Missing columns: ${missing.join(', ')}. Found: ${hd.filter(Boolean).join(', ')}`);
+      }
+
+      // TaskName is not present in the standard Time Overview (Employee/Customer/Job) export.
+      // In that case we fall back to detecting phase from the job name itself.
+      const hasTaskCol = iTask !== -1;
+
+      const period = document.getElementById('period-input').value.trim();
+      if (!period) throw new Error('Please enter a period label (e.g. "February 2026")');
+
+      const dr = rows.slice(hr + 1).filter(r => r[iEmp]);
+
+      // ─── Accumulate data ───
+      const clients = {};  // { name: { total, pre, post, jobType, jobTypes: {} } }
+      const jobTypes = { Campaign: {total:0,pre:0,post:0,clients:new Set()}, Creative: {total:0,pre:0,post:0,clients:new Set()}, Elevated: {total:0,pre:0,post:0,clients:new Set()}, Ecom: {total:0,pre:0,post:0,clients:new Set()}, Other: {total:0,pre:0,post:0,clients:new Set()} };
+      const internal = {};  // { category: hours }
+      // Per-producer tracking
+      const producers = {};
+      const producerClients = {};  // { name: { clientName: { total, pre, post, jobType } } }
+      ALL_TEAM.forEach(name => {
+        producers[name] = { total: 0, client: 0, internal: 0, holiday: 0, sick: 0, pre: 0, post: 0 };
+        producerClients[name] = {};
+      });
+      let totalClient = 0, totalInternal = 0, totalHoliday = 0, totalSick = 0;
+
+      dr.forEach(row => {
+        const emp      = String(row[iEmp]  || '').trim();
+        const cust     = String(row[iCust] || '').trim();
+        const jobname  = String(row[iJob]  || '').trim();
+        const taskname = hasTaskCol ? String(row[iTask] || '').trim() : jobname;
+        const hrs = round1(parseFloat(row[iHrs]) || 0);
+        if (hrs === 0) return;
+
+        // Only process rows belonging to tracked team members
+        const isTeam = ALL_TEAM.some(p => p.toLowerCase() === emp.toLowerCase());
+        const matchedName = isTeam ? ALL_TEAM.find(p => p.toLowerCase() === emp.toLowerCase()) : null;
+
+        if (HOLIDAY_CUSTOMERS.includes(cust)) {
+          if (!matchedName) return;
+          if (cust === '· Holiday') { producers[matchedName].holiday += hrs; producers[matchedName].total += hrs; totalHoliday += hrs; }
+          else { producers[matchedName].sick += hrs; producers[matchedName].total += hrs; totalSick += hrs; }
+          return;
+        }
+
+        if (INTERNAL_CUSTOMERS.includes(cust)) {
+          if (!matchedName) return;
+          producers[matchedName].internal += hrs; producers[matchedName].total += hrs;
+          totalInternal += hrs;
+          const cat = categoriseInternal(taskname);
+          internal[cat] = round1((internal[cat] || 0) + hrs);
+          return;
+        }
+
+        // Client work — only count team members
+        if (!isTeam) return;
+
+        totalClient += hrs;
+        if (matchedName) { producers[matchedName].client += hrs; producers[matchedName].total += hrs; }
+
+        const jt = detectJobType(jobname);
+        const phase = detectPhase(taskname);
+
+        if (!clients[cust]) clients[cust] = { total: 0, pre: 0, post: 0, jobType: jt, jobTypes: {} };
+        const c = clients[cust];
+        c.total = round1(c.total + hrs);
+        if (phase === 'pre') c.pre = round1(c.pre + hrs);
+        else c.post = round1(c.post + hrs);
+        c.jobTypes[jt] = round1((c.jobTypes[jt] || 0) + hrs);
+        c.jobType = Object.entries(c.jobTypes).sort((a,b) => b[1]-a[1])[0][0];
+
+        if (matchedName) {
+          if (phase === 'pre') producers[matchedName].pre += hrs;
+          else producers[matchedName].post += hrs;
+          // Track which clients this producer has worked on
+          if (!producerClients[matchedName][cust]) producerClients[matchedName][cust] = { total: 0, pre: 0, post: 0, jobType: jt };
+          const pc = producerClients[matchedName][cust];
+          pc.total = round1(pc.total + hrs);
+          if (phase === 'pre') pc.pre = round1(pc.pre + hrs);
+          else pc.post = round1(pc.post + hrs);
+        }
+
+        const jtd = jobTypes[jt];
+        jtd.total = round1(jtd.total + hrs);
+        if (phase === 'pre') jtd.pre = round1(jtd.pre + hrs);
+        else jtd.post = round1(jtd.post + hrs);
+        jtd.clients.add(cust);
+      });
+
+      // Convert sets for storage
+      const jobTypesSer = {};
+      Object.entries(jobTypes).forEach(([k,v]) => {
+        jobTypesSer[k] = { total: v.total, pre: v.pre, post: v.post, clients: [...v.clients] };
+      });
+
+      // Round producer values
+      Object.values(producers).forEach(p => {
+        Object.keys(p).forEach(k => { p[k] = round1(p[k]); });
+      });
+
+      const payload = {
+        period, updatedAt: new Date().toISOString(),
+        clients, jobTypes: jobTypesSer, internal, producers, producerClients,
+        totals: { client: round1(totalClient), internal: round1(totalInternal), holiday: round1(totalHoliday), sick: round1(totalSick) }
+      };
+
+      statusEl.textContent = 'Saving…'; statusEl.className = 'save-status saving';
+      if (FIREBASE_DB_URL) {
+        try {
+          await fbPut(FB_PROD, payload);
+          statusEl.textContent = '✓ Saved — report is now live';
+          statusEl.className = 'save-status saved';
+        } catch(err) {
+          statusEl.textContent = 'Save failed: ' + err.message;
+          statusEl.className = 'save-status failed';
+        }
+      } else {
+        statusEl.textContent = '✓ Saved locally';
+        statusEl.className = 'save-status saved';
+      }
+      lsSet(LS_KEY, payload);
+      renderDashboard(payload);
+
+    } catch(err) {
+      errEl.textContent = 'Error: ' + err.message;
+      errEl.style.display = 'block';
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ─── Render ───
+function renderDashboard(p) {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('empty-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('period-badge').textContent = p.period || '--';
+  if (p.updatedAt) document.getElementById('updated-txt').textContent = 'Updated ' + niceDate(p.updatedAt);
+
+  buildKPIs(p);
+  buildClientPreview(p);
+  buildPostProdPreview(p);
+  buildHoursBreakdown(p);
+  buildJobTypesTab(p);
+  buildTeamTab(p);
+}
+
+function buildKPIs(p) {
+  const t = p.totals;
+  const allClient = t.client;
+  let totalPre = 0, totalPost = 0;
+  Object.values(p.clients).forEach(c => { totalPre += c.pre; totalPost += c.post; });
+  totalPre = round1(totalPre); totalPost = round1(totalPost);
+  const prePct = allClient > 0 ? totalPre / allClient : 0;
+
+  document.getElementById('kpi-grid').innerHTML =
+    `<div class="kpi"><div class="kpi-label">Total Client Hours</div><div class="kpi-value teal">${fmt(allClient)}</div><div class="kpi-sub">${Object.keys(p.clients).length} active clients</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Pre-Production</div><div class="kpi-value pre">${fmt(totalPre)}</div><div class="kpi-sub">${fPct(prePct)} of client work</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Post-Production</div><div class="kpi-value post">${fmt(totalPost)}</div><div class="kpi-sub">${fPct(1 - prePct)} of client work</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Internal Time</div><div class="kpi-value" style="color:var(--amber)">${fmt(t.internal)}</div><div class="kpi-sub">Meetings, admin, other</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Holiday / Sick</div><div class="kpi-value" style="color:var(--mid);font-size:28px">${fmt(t.holiday)} <span style="font-size:16px;color:var(--muted)">/ ${fmt(t.sick)}</span></div><div class="kpi-sub">Holiday / Sick hours</div></div>`;
+}
+
+function buildClientPreview(p) {
+  const sorted = Object.entries(p.clients).sort((a,b) => b[1].total - a[1].total);
+  const maxHrs = sorted.length > 0 ? sorted[0][1].total : 1;
+  const totalClient = p.totals.client;
+  const top = sorted.slice(0, 8);
+
+  document.getElementById('clients-sub').textContent = `Top ${top.length} of ${sorted.length} clients`;
+
+  document.getElementById('client-preview').innerHTML = top.map(([name, c], i) => {
+    const pct = totalClient > 0 ? c.total / totalClient : 0;
+    const barPct = maxHrs > 0 ? (c.total / maxHrs * 100).toFixed(1) : 0;
+    return `<div class="client-preview-row">
+      <span class="cp-rank">${i+1}</span>
+      <span class="cp-name">${name}</span>
+      <span class="cp-jt"><span class="jt-badge ${c.jobType}">${c.jobType}</span></span>
+      <span class="cp-hrs">${fmt(c.total)}h</span>
+      <div class="cp-bar"><div class="cp-bar-inner"><div class="cp-bar-fill" style="width:${barPct}%"></div></div></div>
+    </div>`;
+  }).join('');
+}
+
+function buildPostProdPreview(p) {
+  const sorted = Object.entries(p.clients).sort((a,b) => b[1].post - a[1].post);
+  const maxPost = sorted.length > 0 ? sorted[0][1].post : 1;
+  const top = sorted.filter(([,c]) => c.post > 0).slice(0, 8);
+  document.getElementById('postprod-sub').textContent = `Top ${top.length} by post-production hours`;
+  document.getElementById('postprod-preview').innerHTML = top.map(([name, c], i) => {
+    const barPct = maxPost > 0 ? (c.post / maxPost * 100).toFixed(1) : 0;
+    return `<div class="client-preview-row">
+      <span class="cp-rank">${i+1}</span>
+      <span class="cp-name">${name}</span>
+      <span class="cp-jt"><span class="jt-badge ${c.jobType}">${c.jobType}</span></span>
+      <span class="cp-hrs" style="color:var(--post)">${fmt(c.post)}h</span>
+      <div class="cp-bar"><div class="cp-bar-inner"><div class="cp-bar-fill" style="background:var(--post);width:${barPct}%"></div></div></div>
+    </div>`;
+  }).join('');
+}
+
+function buildHoursBreakdown(p) {
+  const t = p.totals;
+  let totalPre = 0, totalPost = 0;
+  Object.values(p.clients).forEach(c => { totalPre += c.pre; totalPost += c.post; });
+  const grandTotal = round1(t.client + t.internal + t.holiday + t.sick) || 1;
+  const segments = [
+    { label: 'Pre-Production',  hrs: round1(totalPre),   color: 'var(--pre)',   pct: totalPre / grandTotal },
+    { label: 'Post-Production', hrs: round1(totalPost),  color: 'var(--post)',  pct: totalPost / grandTotal },
+    { label: 'Internal',        hrs: t.internal,         color: 'var(--amber)', pct: t.internal / grandTotal },
+    { label: 'Holiday',         hrs: t.holiday,          color: '#94a3b8',      pct: t.holiday / grandTotal },
+    { label: 'Sick',            hrs: t.sick,             color: 'var(--red)',   pct: t.sick / grandTotal },
+  ];
+  document.getElementById('breakdown-sub').textContent = `${fmt(grandTotal)} total logged hours · ${p.period}`;
+
+  // Stacked bar
+  const barSegs = segments.map(s => `<div style="width:${(s.pct*100).toFixed(2)}%;height:100%;background:${s.color};min-width:${s.hrs>0?'2px':'0'}" title="${s.label}: ${fmt(s.hrs)}h"></div>`).join('');
+
+  const pills = segments.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--card);border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:10px;height:10px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
+        <span style="font-size:13px;font-weight:500">${s.label}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:${s.color}">${fmt(s.hrs)}<span style="font-size:13px;color:var(--muted);font-weight:400"> hrs</span></span>
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);min-width:42px;text-align:right">${fPct(s.pct)}</span>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('hours-breakdown').innerHTML = `
+    <div style="height:12px;border-radius:3px;overflow:hidden;display:flex;margin-bottom:16px;gap:1px">${barSegs}</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border:1px solid var(--border)">${pills}</div>`;
+}
+
+// ── Job Types tab with filter/sort state ──
+let _jtData = null;
+let _jtSortCol = 'total';
+
+function buildJobTypesTab(p) {
+  _jtData = p;
+  const jts = p.jobTypes;
+  const total = Object.values(jts).reduce((a,v) => a + v.total, 0) || 1;
+  const types = ['Ecom','Campaign','Creative','Elevated','Other'];
+  const colors = {Campaign:'var(--pre)',Creative:'var(--post)',Elevated:'var(--teal)',Ecom:'var(--amber)',Other:'var(--mid)'};
+
+  document.getElementById('jt-cards').innerHTML = types.map(t => {
+    const d = jts[t] || {total:0,pre:0,post:0,clients:[]};
+    const pct = d.total / total;
+    return `<div class="jt-card">
+      <div class="jt-name">${t}</div>
+      <div class="jt-hours" style="color:${colors[t]}">${fmt(d.total)}<span style="font-size:16px;color:var(--muted);font-weight:400"> hrs</span></div>
+      <div class="jt-bar"><div class="jt-bar-fill" style="width:${(pct*100).toFixed(1)}%;background:${colors[t]}"></div></div>
+      <div class="jt-split">
+        <div><div class="jt-split-label">Pre</div><div class="jt-split-item" style="color:var(--pre)">${fmt(d.pre)}h</div></div>
+        <div><div class="jt-split-label">Post</div><div class="jt-split-item" style="color:var(--post)">${fmt(d.post)}h</div></div>
+        <div><div class="jt-split-label">% Total</div><div class="jt-split-item" style="color:var(--mid)">${fPct(pct)}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('jt-table-sub').textContent = `${Object.keys(p.clients).length} clients`;
+  applyJtFilters();
+}
+
+function applyJtFilters() {
+  if (!_jtData) return;
+  const typeFilter = document.getElementById('filter-jt').value;
+  const sortCol    = document.getElementById('filter-sort').value;
+  _jtSortCol = sortCol;
+
+  // Update header highlight
+  ['total','pre','post'].forEach(col => {
+    const el = document.getElementById('th-' + col);
+    if (el) el.style.color = col === sortCol ? 'var(--teal)' : '';
+  });
+
+  const countEl = document.getElementById('jt-filter-count');
+
+  if (!typeFilter) {
+    // Default: grouped by job type, each group sorted by chosen column
+    const types = ['Ecom','Campaign','Creative','Elevated','Other'];
+    let rows = '';
+    types.forEach(type => {
+      const group = Object.entries(_jtData.clients)
+        .filter(([,c]) => c.jobType === type)
+        .sort((a,b) => b[1][sortCol] - a[1][sortCol]);
+      if (group.length === 0) return;
+      rows += `<tr class="group-row"><td colspan="6">${type} <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(${group.length})</span></td></tr>`;
+      group.forEach(([name, c]) => {
+        rows += `<tr>
+          <td>${name}</td>
+          <td style="text-align:center"><span class="jt-badge ${type}">${type}</span></td>
+          <td>${fmt(c.total)}</td>
+          <td style="color:var(--pre)">${c.pre > 0 ? fmt(c.pre) : '—'}</td>
+          <td style="color:var(--post)">${c.post > 0 ? fmt(c.post) : '—'}</td>
+          <td>${phaseBar(c.pre, c.post)}</td>
+        </tr>`;
+      });
+    });
+    document.getElementById('jt-body').innerHTML = rows;
+    if (countEl) countEl.textContent = '';
+  } else {
+    // Flat sorted list — filter by type only if one is selected
+    let entries = Object.entries(_jtData.clients);
+    if (typeFilter) entries = entries.filter(([,c]) => c.jobType === typeFilter);
+    entries.sort((a,b) => (b[1][sortCol] || 0) - (a[1][sortCol] || 0));
+    const badgeType = typeFilter || 'Other';
+    document.getElementById('jt-body').innerHTML = entries.map(([name, c]) => `<tr>
+      <td>${name}</td>
+      <td style="text-align:center"><span class="jt-badge ${c.jobType}">${c.jobType}</span></td>
+      <td>${fmt(c.total)}</td>
+      <td style="color:var(--pre)">${c.pre > 0 ? fmt(c.pre) : '—'}</td>
+      <td style="color:var(--post)">${c.post > 0 ? fmt(c.post) : '—'}</td>
+      <td>${phaseBar(c.pre, c.post)}</td>
+    </tr>`).join('');
+    if (countEl) countEl.textContent = typeFilter ? `${entries.length} result${entries.length !== 1 ? 's' : ''}` : '';
+  }
+}
+
+function setSortCol(col) {
+  document.getElementById('filter-sort').value = col;
+  applyJtFilters();
+}
+
+function resetJtFilters() {
+  document.getElementById('filter-jt').value = '';
+  document.getElementById('filter-sort').value = 'total';
+  applyJtFilters();
+}
+
+function buildPhaseOverview(p) {
+  let pre = 0, post = 0;
+  Object.values(p.clients).forEach(c => { pre += c.pre; post += c.post; });
+  const total = pre + post || 1;
+  document.getElementById('phase-overview').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border)">
+      <div style="background:var(--card);padding:24px 22px">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--pre);margin-bottom:10px">◀ Pre-Production</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:700;color:var(--pre);line-height:1;margin-bottom:6px">${fmt(round1(pre))}<span style="font-size:20px;color:var(--muted);font-weight:400"> hrs</span></div>
+        <div style="font-size:12px;color:var(--muted)">${fPct(pre/total)} of client hours — shoot prep, production co-ordination, on-set time</div>
+      </div>
+      <div style="background:var(--card);padding:24px 22px">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--post);margin-bottom:10px">Post-Production ▶</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:700;color:var(--post);line-height:1;margin-bottom:6px">${fmt(round1(post))}<span style="font-size:20px;color:var(--muted);font-weight:400"> hrs</span></div>
+        <div style="font-size:12px;color:var(--muted)">${fPct(post/total)} of client hours — retouch, QA, amends, post work</div>
+      </div>
+    </div>`;
+}
+
+function buildTeamTab(p) {
+  const prod = p.producers || {};
+  document.getElementById('team-sub').textContent = `${PRODUCERS.length} producers · 1 coordinator · ${p.period}`;
+
+  // ── All cards in one grid (producers + coordinator squeezed at end) ──
+  const allMembers = [...PRODUCERS, ...COORDINATORS];
+  document.getElementById('team-cards').innerHTML = allMembers.map(({ name, title }) => {
+    const d = prod[name] || { total:0, client:0, internal:0, holiday:0, sick:0, pre:0, post:0 };
+    const isCoord = COORDINATORS.some(c => c.name === name);
+    const nameCol = isCoord ? '#a78bfa' : 'var(--teal)';
+    return `<div class="jt-card">
+      <div style="margin-bottom:12px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:.03em;color:${nameCol}">${name}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:3px">${title}</div>
+      </div>
+      <div class="jt-hours" style="color:var(--white)">${fmt(d.client)}<span style="font-size:16px;color:var(--muted);font-weight:400"> client hrs</span></div>
+      <div class="jt-bar" style="margin:10px 0">
+        <div class="jt-bar-fill" style="width:${d.client > 0 ? Math.min((d.pre/d.client)*100,100).toFixed(1) : 0}%;background:var(--pre)"></div>
+      </div>
+      <div class="jt-split">
+        <div><div class="jt-split-label">Pre</div><div class="jt-split-item" style="color:var(--pre)">${fmt(d.pre)}h</div></div>
+        <div><div class="jt-split-label">Post</div><div class="jt-split-item" style="color:var(--post)">${fmt(d.post)}h</div></div>
+        <div><div class="jt-split-label">Internal</div><div class="jt-split-item" style="color:var(--amber)">${fmt(d.internal)}h</div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── Single combined team detail table: producers then coordinator inline ──
+  document.getElementById('team-body').innerHTML = [
+    ...buildMemberRows(PRODUCERS, prod, p, 'var(--teal)'),
+    ...buildMemberRows(COORDINATORS, prod, p, '#a78bfa'),
+  ].join('');
+
+  window._prodData = p;
+}
+
+// Returns array of TR strings for the given members
+function buildMemberRows(members, prod, p, nameColor = 'var(--teal)') {
+  return members.map(({ name, title }) => {
+    const d = prod[name] || { total:0, client:0, internal:0, holiday:0, sick:0, pre:0, post:0 };
+    const safeId = name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+    return `<tr class="producer-row" id="teamrow-${safeId}" onclick="toggleProducerRow('${name}', '${safeId}')" style="cursor:pointer">
+      <td>
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-right:6px" id="chevron-${safeId}">▶</span>
+        <span style="color:${nameColor};font-weight:500">${name}</span>
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-left:18px;margin-top:1px">${title}</div>
+      </td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:#e8edf5;background:rgba(0,212,180,.1);padding:2px 8px;border-radius:2px">${fmt(d.client)}</span></td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--pre)">${d.pre > 0 ? fmt(d.pre) : '—'}</span></td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--post)">${d.post > 0 ? fmt(d.post) : '—'}</span></td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--amber);background:rgba(245,166,35,.1);padding:2px 8px;border-radius:2px">${d.internal > 0 ? fmt(d.internal) : '—'}</span></td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:#94a3b8">${d.holiday > 0 ? fmt(d.holiday) : '—'}</span></td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--red)">${d.sick > 0 ? fmt(d.sick) : '—'}</span></td>
+      <td>${phaseBar(d.pre, d.post)}</td>
+    </tr>`;
+  });
+}
+
+let _activeProducer = null;
+function toggleProducerRow(name, safeId) {
+  const existingExpand = document.getElementById('expand-row-' + safeId);
+
+  // Close if already open
+  if (_activeProducer === name) {
+    if (existingExpand) existingExpand.remove();
+    document.getElementById('chevron-' + safeId).textContent = '▶';
+    _activeProducer = null;
+    return;
+  }
+
+  // Close any previously open row
+  if (_activeProducer) {
+    const prevSafeId = _activeProducer.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+    const prev = document.getElementById('expand-row-' + prevSafeId);
+    if (prev) prev.remove();
+    const prevChev = document.getElementById('chevron-' + prevSafeId);
+    if (prevChev) prevChev.textContent = '▶';
+  }
+
+  _activeProducer = name;
+  document.getElementById('chevron-' + safeId).textContent = '▼';
+
+  const p = window._prodData;
+  const pcClients = (p.producerClients || {})[name] || {};
+  const sorted = Object.entries(pcClients).sort((a,b) => b[1].total - a[1].total);
+
+  let innerHtml;
+  if (!p.producerClients) {
+    innerHtml = `<div style="padding:16px 0;font-family:'DM Mono',monospace;font-size:11px;color:var(--amber)">
+      ⚠ Re-upload the report to enable producer client drilldown — this data wasn't captured in the previous upload.
+    </div>`;
+  } else if (sorted.length === 0) {
+    innerHtml = `<div style="padding:16px 0;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">
+      No client hours found for ${name} in this period.
+    </div>`;
+  } else {
+    const clientHrs = sorted.reduce((s,[,v]) => s + v.total, 0);
+    // Use producer's full total (client + internal + holiday + sick) so % reflects share of all hours
+    const producerTotal = ((p.producers || {})[name] || {}).total || clientHrs || 1;
+    innerHtml = `<table style="width:100%;border-collapse:collapse;margin:4px 0">
+      <thead><tr>
+        <th style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)">#</th>
+        <th style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)">Client</th>
+        <th style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:center;border-bottom:1px solid var(--border)">Job Type</th>
+        <th style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:right;border-bottom:1px solid var(--border)">Hours</th>
+        <th style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:right;border-bottom:1px solid var(--border)">Pre</th>
+        <th style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:right;border-bottom:1px solid var(--border)">Post</th>
+        <th style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:right;border-bottom:1px solid var(--border)">% of Total Hrs</th>
+      </tr></thead>
+      <tbody>
+        ${sorted.map(([client, c], i) => {
+          const pct = c.total / producerTotal;
+          const barW = Math.min(pct * 100, 100).toFixed(1);
+          return `<tr style="border-bottom:1px solid rgba(128,128,170,.06)">
+            <td style="padding:8px 12px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${i+1}</td>
+            <td style="padding:8px 12px;font-size:13px;font-weight:500;color:var(--white)">${client}</td>
+            <td style="padding:8px 12px;text-align:center"><span class="jt-badge ${c.jobType}">${c.jobType}</span></td>
+            <td style="padding:8px 12px;text-align:right">${hrsBar(c.total, sorted[0][1].total)}</td>
+            <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;color:var(--pre)">${c.pre > 0 ? fmt(c.pre) : '—'}</td>
+            <td style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;color:var(--post)">${c.post > 0 ? fmt(c.post) : '—'}</td>
+            <td style="padding:8px 12px;text-align:right">
+              <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
+                <div style="width:80px;height:4px;background:rgba(128,128,170,.12);border-radius:2px;overflow:hidden;flex-shrink:0">
+                  <div style="width:${barW}%;height:100%;background:var(--teal);border-radius:2px"></div>
+                </div>
+                <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--mid);min-width:38px;text-align:right">${fPct(pct)}</span>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+  }
+
+  // Insert expansion row immediately after the producer row
+  const producerRow = document.getElementById('teamrow-' + safeId);
+  const expandRow = document.createElement('tr');
+  expandRow.id = 'expand-row-' + safeId;
+  expandRow.innerHTML = `<td colspan="8" style="padding:0 0 0 28px;background:var(--surface);border-bottom:1px solid var(--border)">${innerHtml}</td>`;
+  producerRow.insertAdjacentElement('afterend', expandRow);
+}
+
+function closeProducerPanel() {
+  // kept for compatibility but not used
+}
+
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ─── Init ───
+window.addEventListener('load', async () => {
+  initTheme();
+  document.getElementById('loading-screen').style.display = 'flex';
+  let data = null;
+  if (FIREBASE_DB_URL) { data = await fbGet(FB_PROD); if (data) lsSet(LS_KEY, data); }
+  if (!data) data = lsGet(LS_KEY);
+  if (data && data.clients) {
+    renderDashboard(data);
+  } else {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('empty-screen').style.display = 'flex';
+  }
+});
+</script>
+</body>
+</html>
